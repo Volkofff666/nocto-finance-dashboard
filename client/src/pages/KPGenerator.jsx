@@ -1,102 +1,55 @@
 import React, { useState } from 'react';
 import { createProposal } from '../services/api';
 import { exportProposalToPDF } from '../utils/pdfExport';
-import Card from '../components/ui/Card';
 import '../styles/pages/KPGenerator.css';
 
 export default function KPGenerator() {
   const [formData, setFormData] = useState({
     clientName: '',
     clientSite: '',
-    clientIndustry: '',
-    problems: [],
-    services: [],
-    cases: [],
-    strategy: '',
-    implementation: '',
-    expectedResults: ''
+    strategy: ''
   });
 
-  const [currentProblem, setCurrentProblem] = useState('');
-  const [currentService, setCurrentService] = useState({ name: '', price: '' });
-  const [currentCase, setCurrentCase] = useState({ title: '', description: '', result: '' });
-  const [activeTab, setActiveTab] = useState('info');
-  const [saving, setSaving] = useState(false);
+  // Проблемы (чекбоксы)
+  const [problems, setProblems] = useState({
+    lowCTR: false,
+    noUTM: false,
+    rsyaLeak: false,
+    bots: false,
+    slowSite: false
+  });
 
-  // Добавление проблемы
-  const handleAddProblem = () => {
-    if (currentProblem.trim()) {
-      setFormData(prev => ({
-        ...prev,
-        problems: [...prev.problems, currentProblem.trim()]
-      }));
-      setCurrentProblem('');
+  // Услуги (чекбоксы + цены)
+  const [services, setServices] = useState({
+    yandexDirect: { checked: false, price: 30000 },
+    audit: { checked: false, price: 15000 },
+    noctoClick: { checked: false, price: 5000 },
+    seo: { checked: false, price: 40000 }
+  });
+
+  // Кейсы
+  const [cases, setCases] = useState([
+    {
+      id: 1,
+      title: 'E-commerce в строительстве',
+      description: 'Клиент терял 60% бюджета на нецелевые клики. Провели глубокий аудит, настроили минус-слова, запустили РК с UTM-метками.',
+      result: '+180% ROI, снижение CPA на 45%',
+      included: false
+    },
+    {
+      id: 2,
+      title: 'B2B SaaS продукт',
+      description: 'Стартап не мог масштабировать лидогенерацию. Создали воронку продаж с квалификацией, настроили LinkedIn Ads и ретаргетинг.',
+      result: 'Рост квалифицированных лидов на 250%',
+      included: false
     }
-  };
-
-  const handleRemoveProblem = (index) => {
-    setFormData(prev => ({
-      ...prev,
-      problems: prev.problems.filter((_, i) => i !== index)
-    }));
-  };
-
-  // Добавление услуги
-  const handleAddService = () => {
-    if (currentService.name.trim() && currentService.price) {
-      setFormData(prev => ({
-        ...prev,
-        services: [...prev.services, { ...currentService, price: parseFloat(currentService.price) }]
-      }));
-      setCurrentService({ name: '', price: '' });
-    }
-  };
-
-  const handleRemoveService = (index) => {
-    setFormData(prev => ({
-      ...prev,
-      services: prev.services.filter((_, i) => i !== index)
-    }));
-  };
-
-  // Добавление кейса
-  const handleAddCase = () => {
-    if (currentCase.title.trim() && currentCase.description.trim()) {
-      setFormData(prev => ({
-        ...prev,
-        cases: [...prev.cases, currentCase]
-      }));
-      setCurrentCase({ title: '', description: '', result: '' });
-    }
-  };
-
-  const handleRemoveCase = (index) => {
-    setFormData(prev => ({
-      ...prev,
-      cases: prev.cases.filter((_, i) => i !== index)
-    }));
-  };
+  ]);
 
   // Расчет итоговой суммы
-  const totalPrice = formData.services.reduce((sum, s) => sum + s.price, 0);
-
-  // Сохранение КП
-  const handleSave = async (status = 'draft') => {
-    try {
-      setSaving(true);
-      await createProposal({
-        ...formData,
-        status,
-        totalPrice
-      });
-      alert(status === 'draft' ? 'Черновик сохранён!' : 'КП создано!');
-    } catch (error) {
-      alert('Ошибка при сохранении');
-      console.error(error);
-    } finally {
-      setSaving(false);
-    }
-  };
+  const totalPrice = Object.values(services).reduce(
+    (sum, service) => sum + (service.checked ? service.price : 0),
+    0
+  );
 
   // Экспорт в PDF
   const handleExportPDF = async () => {
@@ -106,337 +59,276 @@ export default function KPGenerator() {
     }
   };
 
+  // Собираем выбранные проблемы
+  const selectedProblems = Object.entries(problems)
+    .filter(([_, checked]) => checked)
+    .map(([key]) => {
+      const labels = {
+        lowCTR: 'Низкий CTR',
+        noUTM: 'Нет UTM',
+        rsyaLeak: 'Слив на РСЯ',
+        bots: 'Скликивание (Боты)',
+        slowSite: 'Медленный сайт'
+      };
+      return labels[key];
+    });
+
+  // Собираем выбранные услуги
+  const selectedServices = Object.entries(services)
+    .filter(([_, service]) => service.checked)
+    .map(([key, service]) => {
+      const labels = {
+        yandexDirect: 'Настройка Яндекс.Директ',
+        audit: 'Глубокий аудит',
+        noctoClick: 'Защита NoctoClick',
+        seo: 'SEO Оптимизация'
+      };
+      return { name: labels[key], price: service.price };
+    });
+
+  const selectedCases = cases.filter(c => c.included);
+
   return (
-    <div className="kp-generator">
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">ГЕНЕРАТОР КП</h1>
-          <p className="page-subtitle">Создание коммерческого предложения</p>
-        </div>
-        <div className="header-actions">
-          <button onClick={() => handleSave('draft')} className="btn-secondary" disabled={saving}>
-            💾 Сохранить черновик
-          </button>
-          <button onClick={handleExportPDF} className="btn-primary">
-            🖨️ Экспорт в PDF
-          </button>
-        </div>
-      </div>
+    <div className="kp-generator-old">
+      <div className="kp-layout">
+        {/* Левая панель - Редактор */}
+        <div className="kp-editor-panel">
+          <div className="editor-header">
+            <h2>KP EDITOR v1.0</h2>
+          </div>
 
-      <div className="kp-container">
-        {/* Форма редактирования */}
-        <div className="kp-editor">
-          <Card>
-            <div className="tabs">
-              <button 
-                className={`tab ${activeTab === 'info' ? 'active' : ''}`}
-                onClick={() => setActiveTab('info')}
-              >
-                📋 Информация
-              </button>
-              <button 
-                className={`tab ${activeTab === 'problems' ? 'active' : ''}`}
-                onClick={() => setActiveTab('problems')}
-              >
-                ⚠️ Проблемы
-              </button>
-              <button 
-                className={`tab ${activeTab === 'services' ? 'active' : ''}`}
-                onClick={() => setActiveTab('services')}
-              >
-                💼 Услуги
-              </button>
-              <button 
-                className={`tab ${activeTab === 'cases' ? 'active' : ''}`}
-                onClick={() => setActiveTab('cases')}
-              >
-                📊 Кейсы
-              </button>
-              <button 
-                className={`tab ${activeTab === 'strategy' ? 'active' : ''}`}
-                onClick={() => setActiveTab('strategy')}
-              >
-                🎯 Стратегия
-              </button>
-            </div>
+          <div className="editor-section">
+            <label className="section-label">Клиент (Компания)</label>
+            <input
+              type="text"
+              value={formData.clientName}
+              onChange={(e) => setFormData({ ...formData, clientName: e.target.value })}
+              className="editor-input"
+            />
+          </div>
 
-            <div className="tab-content">
-              {/* Вкладка: Информация */}
-              {activeTab === 'info' && (
-                <div className="form-section">
-                  <div className="form-group">
-                    <label>Название клиента *</label>
-                    <input
-                      type="text"
-                      value={formData.clientName}
-                      onChange={(e) => setFormData({ ...formData, clientName: e.target.value })}
-                      placeholder="ООО &quot;Компания&quot;"
-                      className="form-input"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Сайт клиента</label>
-                    <input
-                      type="text"
-                      value={formData.clientSite}
-                      onChange={(e) => setFormData({ ...formData, clientSite: e.target.value })}
-                      placeholder="example.com"
-                      className="form-input"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Отрасль</label>
-                    <input
-                      type="text"
-                      value={formData.clientIndustry}
-                      onChange={(e) => setFormData({ ...formData, clientIndustry: e.target.value })}
-                      placeholder="E-commerce, B2B, Недвижимость..."
-                      className="form-input"
-                    />
-                  </div>
-                </div>
-              )}
+          <div className="editor-section">
+            <label className="section-label">Сайт клиента</label>
+            <input
+              type="text"
+              value={formData.clientSite}
+              onChange={(e) => setFormData({ ...formData, clientSite: e.target.value })}
+              className="editor-input"
+            />
+          </div>
 
-              {/* Вкладка: Проблемы */}
-              {activeTab === 'problems' && (
-                <div className="form-section">
-                  <div className="add-item-group">
-                    <input
-                      type="text"
-                      value={currentProblem}
-                      onChange={(e) => setCurrentProblem(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && handleAddProblem()}
-                      placeholder="Низкий CTR, Слив бюджета, Нет UTM..."
-                      className="form-input"
-                    />
-                    <button onClick={handleAddProblem} className="btn-add">+ Добавить</button>
-                  </div>
-                  <ul className="items-list">
-                    {formData.problems.map((problem, idx) => (
-                      <li key={idx} className="item">
-                        <span>{problem}</span>
-                        <button onClick={() => handleRemoveProblem(idx)} className="btn-remove">✕</button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+          <div className="editor-section">
+            <label className="section-label">Проблемы (Аудит)</label>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={problems.lowCTR}
+                onChange={(e) => setProblems({ ...problems, lowCTR: e.target.checked })}
+              />
+              Низкий CTR
+            </label>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={problems.noUTM}
+                onChange={(e) => setProblems({ ...problems, noUTM: e.target.checked })}
+              />
+              Нет UTM
+            </label>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={problems.rsyaLeak}
+                onChange={(e) => setProblems({ ...problems, rsyaLeak: e.target.checked })}
+              />
+              Слив на РСЯ
+            </label>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={problems.bots}
+                onChange={(e) => setProblems({ ...problems, bots: e.target.checked })}
+              />
+              Скликивание (Боты)
+            </label>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={problems.slowSite}
+                onChange={(e) => setProblems({ ...problems, slowSite: e.target.checked })}
+              />
+              Медленный сайт
+            </label>
+          </div>
 
-              {/* Вкладка: Услуги */}
-              {activeTab === 'services' && (
-                <div className="form-section">
-                  <div className="add-service-group">
-                    <input
-                      type="text"
-                      value={currentService.name}
-                      onChange={(e) => setCurrentService({ ...currentService, name: e.target.value })}
-                      placeholder="Настройка Яндекс.Директ"
-                      className="form-input"
-                    />
-                    <input
-                      type="number"
-                      value={currentService.price}
-                      onChange={(e) => setCurrentService({ ...currentService, price: e.target.value })}
-                      placeholder="30000"
-                      className="form-input price-input"
-                    />
-                    <button onClick={handleAddService} className="btn-add">+ Добавить</button>
-                  </div>
-                  <ul className="services-list">
-                    {formData.services.map((service, idx) => (
-                      <li key={idx} className="service-item">
-                        <span className="service-name">{service.name}</span>
-                        <span className="service-price">{service.price.toLocaleString('ru-RU')} ₽</span>
-                        <button onClick={() => handleRemoveService(idx)} className="btn-remove">✕</button>
-                      </li>
-                    ))}
-                  </ul>
-                  {formData.services.length > 0 && (
-                    <div className="total-price">
-                      <strong>Итого:</strong> {totalPrice.toLocaleString('ru-RU')} ₽
-                    </div>
-                  )}
-                </div>
-              )}
+          <div className="editor-section">
+            <label className="section-label">Что делаем (Услуги)</label>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={services.yandexDirect.checked}
+                onChange={(e) => setServices({
+                  ...services,
+                  yandexDirect: { ...services.yandexDirect, checked: e.target.checked }
+                })}
+              />
+              Настройка Яндекс.Директ (30к)
+            </label>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={services.audit.checked}
+                onChange={(e) => setServices({
+                  ...services,
+                  audit: { ...services.audit, checked: e.target.checked }
+                })}
+              />
+              Глубокий аудит (15к)
+            </label>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={services.noctoClick.checked}
+                onChange={(e) => setServices({
+                  ...services,
+                  noctoClick: { ...services.noctoClick, checked: e.target.checked }
+                })}
+              />
+              Защита NoctoClick (5к/мес)
+            </label>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={services.seo.checked}
+                onChange={(e) => setServices({
+                  ...services,
+                  seo: { ...services.seo, checked: e.target.checked }
+                })}
+              />
+              SEO Оптимизация (40к)
+            </label>
+          </div>
 
-              {/* Вкладка: Кейсы */}
-              {activeTab === 'cases' && (
-                <div className="form-section">
-                  <div className="case-form">
-                    <input
-                      type="text"
-                      value={currentCase.title}
-                      onChange={(e) => setCurrentCase({ ...currentCase, title: e.target.value })}
-                      placeholder="Название кейса (например: E-commerce в строительстве)"
-                      className="form-input"
-                    />
-                    <textarea
-                      value={currentCase.description}
-                      onChange={(e) => setCurrentCase({ ...currentCase, description: e.target.value })}
-                      placeholder="Описание проблемы клиента и нашего решения..."
-                      className="form-textarea"
-                      rows="4"
-                    />
-                    <input
-                      type="text"
-                      value={currentCase.result}
-                      onChange={(e) => setCurrentCase({ ...currentCase, result: e.target.value })}
-                      placeholder="Результат: +150% ROI, снижение CPA на 40%"
-                      className="form-input"
-                    />
-                    <button onClick={handleAddCase} className="btn-add full-width">+ Добавить кейс</button>
-                  </div>
-                  <div className="cases-list">
-                    {formData.cases.map((caseItem, idx) => (
-                      <div key={idx} className="case-card">
-                        <div className="case-header">
-                          <h4>{caseItem.title}</h4>
-                          <button onClick={() => handleRemoveCase(idx)} className="btn-remove">✕</button>
-                        </div>
-                        <p className="case-description">{caseItem.description}</p>
-                        {caseItem.result && (
-                          <p className="case-result">📈 {caseItem.result}</p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Вкладка: Стратегия */}
-              {activeTab === 'strategy' && (
-                <div className="form-section">
-                  <div className="form-group">
-                    <label>Стратегия решения</label>
-                    <textarea
-                      value={formData.strategy}
-                      onChange={(e) => setFormData({ ...formData, strategy: e.target.value })}
-                      placeholder="Опишите комплексный подход к решению задач клиента..."
-                      className="form-textarea"
-                      rows="6"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>План внедрения</label>
-                    <textarea
-                      value={formData.implementation}
-                      onChange={(e) => setFormData({ ...formData, implementation: e.target.value })}
-                      placeholder="Этапы работы: 1. Аудит (1 неделя) 2. Настройка (2 недели)..."
-                      className="form-textarea"
-                      rows="6"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Ожидаемые результаты</label>
-                    <textarea
-                      value={formData.expectedResults}
-                      onChange={(e) => setFormData({ ...formData, expectedResults: e.target.value })}
-                      placeholder="Увеличение конверсии на 30%, снижение CPA на 25%..."
-                      className="form-textarea"
-                      rows="4"
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          </Card>
-        </div>
-
-        {/* Превью КП */}
-        <div className="kp-preview-container">
-          <Card>
-            <div id="kp-preview" className="kp-preview">
-              <div className="kp-header">
-                <h1 className="kp-logo">NOCTO<span className="dot">.</span></h1>
-                <p className="kp-date">{new Date().toLocaleDateString('ru-RU')}</p>
-              </div>
-
-              <h2 className="kp-title">КОММЕРЧЕСКОЕ ПРЕДЛОЖЕНИЕ</h2>
-              <p className="kp-subtitle">
-                Для: <strong>{formData.clientName || 'Клиент'}</strong>
-                {formData.clientSite && <> • {formData.clientSite}</>}
-              </p>
-
-              {formData.clientIndustry && (
-                <p className="kp-industry">Отрасль: {formData.clientIndustry}</p>
-              )}
-
-              {formData.problems.length > 0 && (
-                <div className="kp-section">
-                  <h3>01 // РЕЗУЛЬТАТЫ АУДИТА</h3>
-                  <ul className="kp-list">
-                    {formData.problems.map((p, idx) => (
-                      <li key={idx}>{p}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {formData.cases.length > 0 && (
-                <div className="kp-section">
-                  <h3>02 // НАШИ КЕЙСЫ</h3>
-                  {formData.cases.map((caseItem, idx) => (
-                    <div key={idx} className="kp-case">
-                      <h4>{caseItem.title}</h4>
-                      <p>{caseItem.description}</p>
-                      {caseItem.result && <p className="kp-case-result">✓ {caseItem.result}</p>}
-                    </div>
+          <div className="editor-section">
+            <label className="section-label">Добавить кейсы</label>
+            {cases.map(caseItem => (
+              <label key={caseItem.id} className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={caseItem.included}
+                  onChange={(e) => setCases(cases.map(c => 
+                    c.id === caseItem.id ? { ...c, included: e.target.checked } : c
                   ))}
-                </div>
-              )}
+                />
+                {caseItem.title}
+              </label>
+            ))}
+          </div>
 
-              {formData.strategy && (
-                <div className="kp-section">
-                  <h3>03 // СТРАТЕГИЯ РЕШЕНИЯ</h3>
-                  <p className="kp-text">{formData.strategy}</p>
-                </div>
-              )}
+          <div className="editor-section">
+            <label className="section-label">Комментарий / Стратегия</label>
+            <textarea
+              value={formData.strategy}
+              onChange={(e) => setFormData({ ...formData, strategy: e.target.value })}
+              className="editor-textarea"
+              rows="6"
+            />
+          </div>
+        </div>
 
-              {formData.implementation && (
-                <div className="kp-section">
-                  <h3>04 // ПЛАН ВНЕДРЕНИЯ</h3>
-                  <p className="kp-text" style={{ whiteSpace: 'pre-line' }}>{formData.implementation}</p>
-                </div>
-              )}
-
-              {formData.services.length > 0 && (
-                <div className="kp-section">
-                  <h3>05 // СТОИМОСТЬ УСЛУГ</h3>
-                  <table className="kp-table">
-                    <thead>
-                      <tr>
-                        <th>Услуга</th>
-                        <th>Стоимость</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {formData.services.map((service, idx) => (
-                        <tr key={idx}>
-                          <td>{service.name}</td>
-                          <td>{service.price.toLocaleString('ru-RU')} ₽</td>
-                        </tr>
-                      ))}
-                      <tr className="total-row">
-                        <td><strong>ИТОГО ИНВЕСТИЦИИ:</strong></td>
-                        <td><strong>{totalPrice.toLocaleString('ru-RU')} ₽</strong></td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {formData.expectedResults && (
-                <div className="kp-section">
-                  <h3>06 // ОЖИДАЕМЫЕ РЕЗУЛЬТАТЫ</h3>
-                  <p className="kp-text">{formData.expectedResults}</p>
-                </div>
-              )}
-
-              <div className="kp-footer">
-                <p>NOCTO AGENCY • ЕКАТЕРИНБУРГ • NOCTO.RU</p>
+        {/* Правая панель - Превью */}
+        <div className="kp-preview-panel">
+          <div id="kp-preview" className="kp-document">
+            {/* Шапка */}
+            <div className="kp-doc-header">
+              <div className="kp-logo-big">NOCTO<span className="dot">.</span></div>
+              <div className="kp-meta">
+                <div>Дата: {new Date().toLocaleDateString('ru-RU')}</div>
+                <div>Менеджер: Admin</div>
               </div>
             </div>
-          </Card>
+
+            {/* Заголовок */}
+            <div className="kp-doc-title">
+              <h1>КОММЕРЧЕСКОЕ<br />ПРЕДЛОЖЕНИЕ</h1>
+            </div>
+
+            <div className="kp-doc-client">
+              <div className="client-label">Для:</div>
+              <div className="client-name">{formData.clientName || 'Клиент'}</div>
+              {formData.clientSite && <div className="client-site">{formData.clientSite}</div>}
+            </div>
+
+            {/* 01 АУДИТ */}
+            {selectedProblems.length > 0 && (
+              <div className="kp-doc-section">
+                <h2 className="section-number">01 // РЕЗУЛЬТАТЫ ЭКСПРЕСС-АУДИТА</h2>
+                <ul className="problems-list">
+                  {selectedProblems.map((problem, idx) => (
+                    <li key={idx}>{problem}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* 02 КЕЙСЫ */}
+            {selectedCases.length > 0 && (
+              <div className="kp-doc-section">
+                <h2 className="section-number">02 // НАШИ КЕЙСЫ</h2>
+                {selectedCases.map((caseItem, idx) => (
+                  <div key={idx} className="case-block">
+                    <h3 className="case-title">{caseItem.title}</h3>
+                    <p className="case-desc">{caseItem.description}</p>
+                    <p className="case-result">✓ {caseItem.result}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* 03 СТРАТЕГИЯ */}
+            {formData.strategy && (
+              <div className="kp-doc-section">
+                <h2 className="section-number">
+                  {selectedCases.length > 0 ? '03' : '02'} // СТРАТЕГИЯ
+                </h2>
+                <p className="strategy-text">{formData.strategy}</p>
+              </div>
+            )}
+
+            {/* 04 СТОИМОСТЬ */}
+            {selectedServices.length > 0 && (
+              <div className="kp-doc-section">
+                <h2 className="section-number">
+                  {selectedCases.length > 0 && formData.strategy ? '04' : 
+                   selectedCases.length > 0 || formData.strategy ? '03' : '02'} // СТОИМОСТЬ УСЛУГ
+                </h2>
+                <table className="services-table">
+                  <tbody>
+                    {selectedServices.map((service, idx) => (
+                      <tr key={idx}>
+                        <td>{service.name}</td>
+                        <td className="price-cell">{(service.price / 1000).toFixed(0)}к ₽</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="total-block">
+                  <div className="total-label">Итого инвестиции:</div>
+                  <div className="total-price">{totalPrice.toLocaleString('ru-RU')} ₽</div>
+                </div>
+              </div>
+            )}
+
+            {/* Футер */}
+            <div className="kp-doc-footer">
+              NOCTO AGENCY • EKATERINBURG • NOCTO.RU
+            </div>
+          </div>
+
+          {/* Кнопка экспорта */}
+          <button onClick={handleExportPDF} className="export-btn">
+            🖨️ СОХРАНИТЬ PDF
+          </button>
         </div>
       </div>
     </div>
