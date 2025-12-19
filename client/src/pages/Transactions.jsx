@@ -1,90 +1,131 @@
-import React, { useEffect, useState } from 'react';
-import { fetchTransactions, createTransaction } from '../services/api';
+import React, { useState, useEffect } from 'react';
+import { fetchTransactions, deleteTransaction, updateTransaction } from '../services/api';
 import Card from '../components/ui/Card';
 import TransactionTable from '../components/tables/TransactionTable';
 import DateRangeFilter from '../components/filters/DateRangeFilter';
 import AddTransactionModal from '../components/modals/AddTransactionModal';
+import EditTransactionModal from '../components/modals/EditTransactionModal';
 import '../styles/pages/Transactions.css';
 
 export default function Transactions() {
   const [transactions, setTransactions] = useState([]);
-  const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, pages: 1 });
-  const [dateFilter, setDateFilter] = useState({ startDate: '', endDate: '' });
+  const [filteredTransactions, setFilteredTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState(null);
+  const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0 });
+  const [dateRange, setDateRange] = useState({ startDate: null, endDate: null });
 
   useEffect(() => {
     loadTransactions();
-  }, [pagination.page, dateFilter]);
+  }, [pagination.page, dateRange]);
 
-  async function loadTransactions() {
+  const loadTransactions = async () => {
     try {
       setLoading(true);
-      const data = await fetchTransactions({
+      const params = {
         page: pagination.page,
         limit: pagination.limit,
-        ...dateFilter
-      });
-      setTransactions(data.data);
-      setPagination(prev => ({ ...prev, ...data.pagination }));
+        ...(dateRange.startDate && { startDate: dateRange.startDate }),
+        ...(dateRange.endDate && { endDate: dateRange.endDate })
+      };
+      const response = await fetchTransactions(params);
+      setTransactions(response.data);
+      setFilteredTransactions(response.data);
+      setPagination(prev => ({ ...prev, total: response.pagination.total }));
     } catch (error) {
-      console.error('Failed to load transactions:', error);
+      console.error('Load transactions error:', error);
     } finally {
       setLoading(false);
     }
-  }
+  };
 
-  const handleAddTransaction = async (transactionData) => {
+  const handleDateRangeChange = (range) => {
+    setDateRange(range);
+    setPagination(prev => ({ ...prev, page: 1 }));
+  };
+
+  const handleEdit = (transaction) => {
+    setEditingTransaction(transaction);
+    setShowEditModal(true);
+  };
+
+  const handleUpdate = async (formData) => {
     try {
-      await createTransaction(transactionData);
-      setShowAddModal(false);
-      loadTransactions();
+      await updateTransaction(editingTransaction.id, formData);
+      await loadTransactions();
+      setShowEditModal(false);
+      setEditingTransaction(null);
     } catch (error) {
-      console.error('Failed to add transaction:', error);
+      console.error('Update error:', error);
+      throw error;
     }
   };
 
-  const handlePageChange = (newPage) => {
-    setPagination(prev => ({ ...prev, page: newPage }));
+  const handleDelete = async (id) => {
+    try {
+      await deleteTransaction(id);
+      await loadTransactions();
+    } catch (error) {
+      console.error('Delete error:', error);
+      alert('Ошибка при удалении транзакции');
+    }
   };
+
+  const handleAddSuccess = () => {
+    setShowAddModal(false);
+    loadTransactions();
+  };
+
+  const totalPages = Math.ceil(pagination.total / pagination.limit);
 
   return (
     <div className="transactions-page">
       <div className="page-header">
         <div>
-          <h1 className="page-title">ВСЕ ТРАНЗАКЦИИ</h1>
-          <p className="page-subtitle">Полная история операций</p>
+          <h1 className="page-title">ТРАНЗАКЦИИ</h1>
+          <p className="page-subtitle">Управление доходами и расходами</p>
         </div>
         <button onClick={() => setShowAddModal(true)} className="btn-primary">
-          <i className="icon-plus"></i>
-          Добавить транзакцию
+          + Добавить транзакцию
         </button>
       </div>
 
       <Card>
-        <DateRangeFilter onFilterChange={setDateFilter} />
-        
+        <div className="transactions-filters">
+          <DateRangeFilter onChange={handleDateRangeChange} />
+        </div>
+
         {loading ? (
           <div className="loading-state">Загрузка...</div>
+        ) : filteredTransactions.length === 0 ? (
+          <div className="empty-state">
+            <p>Транзакции не найдены</p>
+          </div>
         ) : (
           <>
-            <TransactionTable transactions={transactions} />
-            
-            {pagination.pages > 1 && (
+            <TransactionTable 
+              transactions={filteredTransactions} 
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+            />
+
+            {totalPages > 1 && (
               <div className="pagination">
-                <button 
-                  onClick={() => handlePageChange(pagination.page - 1)}
+                <button
+                  onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
                   disabled={pagination.page === 1}
                   className="pagination-btn"
                 >
                   ← Предыдущая
                 </button>
                 <span className="pagination-info">
-                  Страница {pagination.page} из {pagination.pages}
+                  Страница {pagination.page} из {totalPages}
                 </span>
-                <button 
-                  onClick={() => handlePageChange(pagination.page + 1)}
-                  disabled={pagination.page === pagination.pages}
+                <button
+                  onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                  disabled={pagination.page >= totalPages}
                   className="pagination-btn"
                 >
                   Следующая →
@@ -98,7 +139,18 @@ export default function Transactions() {
       {showAddModal && (
         <AddTransactionModal 
           onClose={() => setShowAddModal(false)}
-          onSubmit={handleAddTransaction}
+          onSuccess={handleAddSuccess}
+        />
+      )}
+
+      {showEditModal && editingTransaction && (
+        <EditTransactionModal
+          transaction={editingTransaction}
+          onClose={() => {
+            setShowEditModal(false);
+            setEditingTransaction(null);
+          }}
+          onSubmit={handleUpdate}
         />
       )}
     </div>
