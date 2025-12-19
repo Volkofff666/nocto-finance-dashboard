@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import financeRoutes from './routes/finance.js';
 import proposalRoutes from './routes/proposals.js';
+import employeeRoutes from './routes/employees.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -26,6 +27,7 @@ app.get('/health', (req, res) => {
 // Routes
 app.use('/api/finance', financeRoutes);
 app.use('/api/proposals', proposalRoutes);
+app.use('/api/employees', employeeRoutes);
 
 // 404 handler
 app.use((req, res) => {
@@ -42,7 +44,7 @@ app.use((err, req, res, next) => {
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`\n🚀 Nocto Finance API running on http://localhost:${PORT}`);
-  console.log(`📡 Mode: MOCK (in-memory storage)`);
-  console.log(`📊 Health check: http://localhost:${PORT}/health\n`);
+  console.log(`\nСервер Nocto Finance запущен: http://localhost:${PORT}`);
+  console.log(`Режим: MOCK (in-memory storage)`);
+  console.log(`Health check: http://localhost:${PORT}/health\n`);
 });
