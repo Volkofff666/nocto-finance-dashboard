@@ -1,13 +1,10 @@
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 async function fetchAPI(endpoint, options = {}) {
-  const token = localStorage.getItem('token');
-
   const response = await fetch(`${API_URL}${endpoint}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` }),
       ...options.headers
     }
   });
@@ -19,19 +16,6 @@ async function fetchAPI(endpoint, options = {}) {
 
   return response.json();
 }
-
-// Auth API
-export const login = (email, password) =>
-  fetchAPI('/auth/login', {
-    method: 'POST',
-    body: JSON.stringify({ email, password })
-  });
-
-export const register = (data) =>
-  fetchAPI('/auth/register', {
-    method: 'POST',
-    body: JSON.stringify(data)
-  });
 
 // Finance API
 export const fetchFinanceStats = () => fetchAPI('/finance/stats');
