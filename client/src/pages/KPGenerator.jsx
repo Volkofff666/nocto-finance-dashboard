@@ -1,219 +1,381 @@
 import React, { useState } from 'react';
+import { exportProposalToPDF, generateProposalFilename } from '../utils/pdfExport';
 import { createProposal } from '../services/api';
-import Card from '../components/ui/Card';
-import { formatMoney } from '../utils/formatMoney';
 import './KPGenerator.css';
 
 export default function KPGenerator() {
   const [clientName, setClientName] = useState('');
   const [clientSite, setClientSite] = useState('');
-  const [problems, setProblems] = useState([]);
-  const [services, setServices] = useState([]);
   const [strategy, setStrategy] = useState('');
-  const [saving, setSaving] = useState(false);
+  const [problems, setProblems] = useState([{ id: 1, text: '' }]);
+  const [services, setServices] = useState([{ id: 1, name: '', price: 0 }]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
-  const problemOptions = [
+  // Список предустановленных проблем для быстрого выбора
+  const commonProblems = [
     'Низкий CTR',
-    'Нет UTM',
-    'Слив на РСЯ',
+    'Нет UTM-меток',
+    'Слив бюджета на РСЯ',
     'Скликивание (Боты)',
-    'Медленный сайт'
+    'Медленная загрузка сайта',
+    'Плохая конверсия'
   ];
 
-  const serviceOptions = [
+  // Список типовых услуг
+  const commonServices = [
     { name: 'Настройка Яндекс.Директ', price: 30000 },
     { name: 'Глубокий аудит', price: 15000 },
     { name: 'Защита NoctoClick', price: 5000 },
-    { name: 'SEO Оптимизация', price: 40000 }
+    { name: 'SEO Оптимизация', price: 40000 },
+    { name: 'Ведение РК (месяц)', price: 25000 }
   ];
 
-  const toggleProblem = (problem) => {
-    setProblems(prev =>
-      prev.includes(problem)
-        ? prev.filter(p => p !== problem)
-        : [...prev, problem]
-    );
+  // Добавление проблемы
+  const addProblem = () => {
+    setProblems([...problems, { id: Date.now(), text: '' }]);
   };
 
-  const toggleService = (service) => {
-    setServices(prev => {
-      const exists = prev.find(s => s.name === service.name);
-      return exists
-        ? prev.filter(s => s.name !== service.name)
-        : [...prev, service];
-    });
+  const removeProblem = (id) => {
+    if (problems.length > 1) {
+      setProblems(problems.filter(p => p.id !== id));
+    }
   };
 
-  const totalPrice = services.reduce((sum, s) => sum + s.price, 0);
+  const updateProblem = (id, text) => {
+    setProblems(problems.map(p => p.id === id ? { ...p, text } : p));
+  };
 
+  // Добавление услуги
+  const addService = () => {
+    setServices([...services, { id: Date.now(), name: '', price: 0 }]);
+  };
+
+  const removeService = (id) => {
+    if (services.length > 1) {
+      setServices(services.filter(s => s.id !== id));
+    }
+  };
+
+  const updateService = (id, field, value) => {
+    setServices(services.map(s => 
+      s.id === id ? { ...s, [field]: value } : s
+    ));
+  };
+
+  // Автоматический расчёт итоговой суммы
+  const calculateTotal = () => {
+    return services.reduce((sum, service) => sum + (parseFloat(service.price) || 0), 0);
+  };
+
+  const totalPrice = calculateTotal();
+
+  // Сохранение черновика
   const handleSaveDraft = async () => {
-    if (!clientName || problems.length === 0 || services.length === 0 || !strategy) {
-      alert('Заполните все обязательные поля');
+    if (!clientName.trim()) {
+      alert('Укажите имя клиента');
       return;
     }
 
+    setIsSaving(true);
     try {
-      setSaving(true);
-      await createProposal({
+      const proposalData = {
         clientName,
         clientSite,
-        problems,
-        services,
+        problems: problems.filter(p => p.text.trim()).map(p => p.text),
+        services: services.filter(s => s.name.trim()).map(({ name, price }) => ({ name, price: parseFloat(price) || 0 })),
         strategy,
+        totalPrice,
         status: 'draft'
-      });
-      alert('Черновик сохранен!');
+      };
+
+      await createProposal(proposalData);
+      alert('Черновик сохранён!');
     } catch (error) {
-      alert('Ошибка: ' + error.message);
+      console.error('Ошибка при сохранении:', error);
+      alert('Не удалось сохранить черновик');
     } finally {
-      setSaving(false);
+      setIsSaving(false);
     }
   };
 
-  const handleExportPDF = () => {
-    alert('Экспорт в PDF будет добавлен в следующей версии');
+  // Экспорт в PDF
+  const handleExportPDF = async () => {
+    if (!clientName.trim()) {
+      alert('Укажите имя клиента перед экспортом');
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      const element = document.getElementById('kp-preview');
+      const filename = generateProposalFilename(clientName);
+      
+      await exportProposalToPDF(element, filename);
+      alert('PDF успешно создан!');
+
+      // Сохраняем КП со статусом 'sent' после экспорта
+      const proposalData = {
+        clientName,
+        clientSite,
+        problems: problems.filter(p => p.text.trim()).map(p => p.text),
+        services: services.filter(s => s.name.trim()).map(({ name, price }) => ({ name, price: parseFloat(price) || 0 })),
+        strategy,
+        totalPrice,
+        status: 'sent'
+      };
+
+      await createProposal(proposalData);
+    } catch (error) {
+      console.error('Ошибка при экспорте PDF:', error);
+      alert('Не удалось создать PDF');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
     <div className="kp-generator">
       <div className="topbar">
         <div className="breadcrumbs">NOCTO / ГЕНЕРАТОР КП</div>
-        <div className="topbar__actions">
-          <button className="btn-secondary" onClick={handleSaveDraft} disabled={saving}>
-            <i className="fas fa-save"></i>
-            {saving ? 'Сохранение...' : 'Сохранить черновик'}
-          </button>
-          <button className="btn-primary" onClick={handleExportPDF}>
-            <i className="fas fa-file-pdf"></i>
-            Экспорт PDF
-          </button>
-        </div>
       </div>
 
-      <div className="kp-grid">
-        <div className="kp-editor">
-          <Card>
-            <h2 className="section-title">Данные клиента</h2>
+      <div className="kp-layout">
+        {/* Левая панель - форма ввода */}
+        <div className="kp-form">
+          <div className="card">
+            <h3 className="form-title">ДАННЫЕ КЛИЕНТА</h3>
+            
             <div className="form-group">
-              <label>Компания *</label>
+              <label>Имя клиента / Компания *</label>
               <input
                 type="text"
                 value={clientName}
                 onChange={(e) => setClientName(e.target.value)}
-                placeholder="ООО 'Клиент'"
+                placeholder="ООО \"Пример\""
+                className="form-input"
+                required
               />
             </div>
+
             <div className="form-group">
-              <label>Сайт</label>
+              <label>Сайт клиента</label>
               <input
                 type="text"
                 value={clientSite}
                 onChange={(e) => setClientSite(e.target.value)}
-                placeholder="site.ru"
+                placeholder="example.ru"
+                className="form-input"
               />
             </div>
-          </Card>
+          </div>
 
-          <Card>
-            <h2 className="section-title">Проблемы (Аудит) *</h2>
-            <div className="checkbox-grid">
-              {problemOptions.map((problem) => (
-                <label key={problem} className="checkbox-item">
-                  <input
-                    type="checkbox"
-                    checked={problems.includes(problem)}
-                    onChange={() => toggleProblem(problem)}
-                  />
-                  <span>{problem}</span>
-                </label>
+          <div className="card">
+            <h3 className="form-title">ПРОБЛЕМЫ (АУДИТ)</h3>
+            
+            {/* Быстрые проблемы */}
+            <div className="quick-pills">
+              {commonProblems.map((problem) => (
+                <button
+                  key={problem}
+                  onClick={() => {
+                    const emptyProblem = problems.find(p => !p.text.trim());
+                    if (emptyProblem) {
+                      updateProblem(emptyProblem.id, problem);
+                    } else {
+                      setProblems([...problems, { id: Date.now(), text: problem }]);
+                    }
+                  }}
+                  className="pill-btn"
+                >
+                  + {problem}
+                </button>
               ))}
             </div>
-          </Card>
 
-          <Card>
-            <h2 className="section-title">Услуги *</h2>
-            <div className="service-list">
-              {serviceOptions.map((service) => (
-                <label key={service.name} className="service-item">
-                  <input
-                    type="checkbox"
-                    checked={services.some(s => s.name === service.name)}
-                    onChange={() => toggleService(service)}
-                  />
-                  <span className="service-name">{service.name}</span>
-                  <span className="service-price mono">{formatMoney(service.price)}</span>
-                </label>
+            {problems.map((problem) => (
+              <div key={problem.id} className="form-group-inline">
+                <input
+                  type="text"
+                  value={problem.text}
+                  onChange={(e) => updateProblem(problem.id, e.target.value)}
+                  placeholder="Опишите проблему"
+                  className="form-input"
+                />
+                <button
+                  onClick={() => removeProblem(problem.id)}
+                  className="btn-icon btn-danger"
+                  disabled={problems.length === 1}
+                >
+                  <i className="fas fa-trash"></i>
+                </button>
+              </div>
+            ))}
+
+            <button onClick={addProblem} className="btn-secondary full-width">
+              <i className="fas fa-plus"></i> Добавить проблему
+            </button>
+          </div>
+
+          <div className="card">
+            <h3 className="form-title">УСЛУГИ И СТОИМОСТЬ</h3>
+            
+            {/* Быстрые услуги */}
+            <div className="quick-pills">
+              {commonServices.map((service) => (
+                <button
+                  key={service.name}
+                  onClick={() => {
+                    const emptyService = services.find(s => !s.name.trim());
+                    if (emptyService) {
+                      updateService(emptyService.id, 'name', service.name);
+                      updateService(emptyService.id, 'price', service.price);
+                    } else {
+                      setServices([...services, { id: Date.now(), name: service.name, price: service.price }]);
+                    }
+                  }}
+                  className="pill-btn"
+                >
+                  + {service.name}
+                </button>
               ))}
             </div>
-          </Card>
 
-          <Card>
-            <h2 className="section-title">Стратегия *</h2>
+            {services.map((service) => (
+              <div key={service.id} className="form-group-service">
+                <input
+                  type="text"
+                  value={service.name}
+                  onChange={(e) => updateService(service.id, 'name', e.target.value)}
+                  placeholder="Название услуги"
+                  className="form-input"
+                />
+                <input
+                  type="number"
+                  value={service.price || ''}
+                  onChange={(e) => updateService(service.id, 'price', e.target.value)}
+                  placeholder="Цена"
+                  className="form-input form-input-price"
+                  min="0"
+                />
+                <button
+                  onClick={() => removeService(service.id)}
+                  className="btn-icon btn-danger"
+                  disabled={services.length === 1}
+                >
+                  <i className="fas fa-trash"></i>
+                </button>
+              </div>
+            ))}
+
+            <button onClick={addService} className="btn-secondary full-width">
+              <i className="fas fa-plus"></i> Добавить услугу
+            </button>
+
+            <div className="total-sum">
+              <span>ИТОГО:</span>
+              <span className="total-amount">{totalPrice.toLocaleString('ru-RU')} ₽</span>
+            </div>
+          </div>
+
+          <div className="card">
+            <h3 className="form-title">СТРАТЕГИЯ / КОММЕНТАРИЙ</h3>
             <textarea
               value={strategy}
               onChange={(e) => setStrategy(e.target.value)}
-              placeholder="Мы предлагаем комплексный подход..."
-              rows="6"
+              placeholder="Опишите предлагаемую стратегию работы..."
+              className="form-textarea"
+              rows={6}
             />
-          </Card>
+          </div>
+
+          <div className="form-actions">
+            <button
+              onClick={handleSaveDraft}
+              className="btn-secondary"
+              disabled={isSaving}
+            >
+              <i className="fas fa-save"></i>
+              {isSaving ? 'Сохранение...' : 'Сохранить черновик'}
+            </button>
+            <button
+              onClick={handleExportPDF}
+              className="btn-primary"
+              disabled={isExporting}
+            >
+              <i className="fas fa-file-pdf"></i>
+              {isExporting ? 'Экспорт...' : 'Экспортировать PDF'}
+            </button>
+          </div>
         </div>
 
-        <div className="kp-preview">
-          <Card>
-            <h2 className="section-title">Превью</h2>
-            <div className="preview-content">
-              <div className="preview-header">
-                <h3>NOCTO.</h3>
-                <p className="preview-date">{new Date().toLocaleDateString('ru-RU')}</p>
+        {/* Правая панель - превью КП */}
+        <div className="kp-preview-wrapper">
+          <div className="card">
+            <h3 className="form-title">ПРЕВЬЮ КП</h3>
+            <div id="kp-preview" className="kp-preview">
+              <div className="kp-header">
+                <h1 className="kp-logo">NOCTO<span className="dot">.</span></h1>
+                <div className="kp-meta">
+                  <p>Дата: {new Date().toLocaleDateString('ru-RU')}</p>
+                  <p>Менеджер: Admin</p>
+                </div>
               </div>
 
-              <div className="preview-section">
-                <h4>Коммерческое предложение</h4>
-                <p><strong>Для:</strong> {clientName || 'Клиент'}</p>
-                {clientSite && <p><strong>Сайт:</strong> {clientSite}</p>}
+              <h2 className="kp-title">КОММЕРЧЕСКОЕ<br/>ПРЕДЛОЖЕНИЕ</h2>
+              
+              <div className="kp-section">
+                <p className="kp-client-info">
+                  Для: <strong>{clientName || '___________'}</strong>
+                </p>
+                {clientSite && (
+                  <p className="kp-client-site">{clientSite}</p>
+                )}
               </div>
 
-              {problems.length > 0 && (
-                <div className="preview-section">
-                  <h4>01 // Результаты аудита</h4>
-                  <ul>
-                    {problems.map((p, i) => (
-                      <li key={i}>{p}</li>
+              {problems.some(p => p.text.trim()) && (
+                <div className="kp-section">
+                  <h3 className="kp-section-title">01 // РЕЗУЛЬТАТЫ ЭКСПРЕСС-АУДИТА</h3>
+                  <ul className="kp-list">
+                    {problems.filter(p => p.text.trim()).map((problem, idx) => (
+                      <li key={idx}>{problem.text}</li>
                     ))}
                   </ul>
                 </div>
               )}
 
               {strategy && (
-                <div className="preview-section">
-                  <h4>02 // Стратегия</h4>
-                  <p>{strategy}</p>
+                <div className="kp-section">
+                  <h3 className="kp-section-title">02 // СТРАТЕГИЯ</h3>
+                  <p className="kp-text">{strategy}</p>
                 </div>
               )}
 
-              {services.length > 0 && (
-                <div className="preview-section">
-                  <h4>03 // Стоимость услуг</h4>
-                  <ul className="services-list">
-                    {services.map((s, i) => (
-                      <li key={i}>
-                        <span>{s.name}</span>
-                        <span className="mono">{formatMoney(s.price)}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <div className="total-price">
-                    <strong>Итого инвестиции:</strong>
-                    <span className="mono text-green">{formatMoney(totalPrice)}</span>
+              {services.some(s => s.name.trim()) && (
+                <div className="kp-section">
+                  <h3 className="kp-section-title">03 // СТОИМОСТЬ УСЛУГ</h3>
+                  <table className="kp-table">
+                    <tbody>
+                      {services.filter(s => s.name.trim()).map((service, idx) => (
+                        <tr key={idx}>
+                          <td>{service.name}</td>
+                          <td className="kp-price">{(parseFloat(service.price) || 0).toLocaleString('ru-RU')} ₽</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div className="kp-total">
+                    <span>Итого инвестиции:</span>
+                    <span className="kp-total-amount">{totalPrice.toLocaleString('ru-RU')} ₽</span>
                   </div>
                 </div>
               )}
 
-              <div className="preview-footer">
-                <p>NOCTO AGENCY • ЕКАТЕРИНБУРГ • NOCTO.RU</p>
+              <div className="kp-footer">
+                <p>NOCTO AGENCY • EKATERINBURG • NOCTO.RU</p>
               </div>
             </div>
-          </Card>
+          </div>
         </div>
       </div>
     </div>
