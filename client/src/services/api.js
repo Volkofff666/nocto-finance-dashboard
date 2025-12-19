@@ -66,3 +66,11 @@ export const deleteProposal = (id) =>
   fetchAPI(`/proposals/${id}`, {
     method: 'DELETE'
   });
+
+// Employees API
+export const fetchEmployeePerformance = (params) => {
+  const query = new URLSearchParams(params).toString();
+  return fetchAPI(`/employees/performance?${query}`);
+};
+
+export const fetchEmployee = (id) => fetchAPI(`/employees/${id}`);
