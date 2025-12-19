@@ -1,17 +1,8 @@
 import React from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../hooks/useAuth';
+import { NavLink } from 'react-router-dom';
 import './Sidebar.css';
 
 export default function Sidebar() {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
-
   return (
     <aside className="sidebar">
       <div className="sidebar__logo">
@@ -24,6 +15,11 @@ export default function Sidebar() {
           <span>Dashboard</span>
         </NavLink>
         
+        <NavLink to="/transactions" className={({ isActive }) => `menu__item ${isActive ? 'active' : ''}`}>
+          <i className="fas fa-exchange-alt"></i>
+          <span>Транзакции</span>
+        </NavLink>
+        
         <NavLink to="/kp-generator" className={({ isActive }) => `menu__item ${isActive ? 'active' : ''}`}>
           <i className="fas fa-file-invoice"></i>
           <span>Генератор КП</span>
@@ -32,18 +28,12 @@ export default function Sidebar() {
 
       <div className="sidebar__footer">
         <div className="user-mini">
-          <div className="avatar">
-            {user?.name?.charAt(0).toUpperCase() || 'U'}
-          </div>
+          <div className="avatar">A</div>
           <div className="user-info">
-            <div className="name">{user?.name || 'User'}</div>
-            <div className="role">{user?.role || 'manager'}</div>
+            <div className="name">Admin</div>
+            <div className="role">Nocto Agency</div>
           </div>
         </div>
-        <button className="logout-btn" onClick={handleLogout}>
-          <i className="fas fa-sign-out-alt"></i>
-          Выйти
-        </button>
       </div>
     </aside>
   );
