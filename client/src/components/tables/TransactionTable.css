@@ -25,6 +25,10 @@
   text-align: right;
 }
 
+.text-center {
+  text-align: center;
+}
+
 .amount {
   font-family: var(--font-num);
   font-weight: 600;
@@ -51,4 +55,39 @@
 .status-expense {
   background: rgba(239, 68, 68, 0.15);
   color: var(--danger);
+}
+
+/* Action buttons */
+.table-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  align-items: center;
+}
+
+.btn-action {
+  padding: 6px 10px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-action:hover {
+  transform: translateY(-1px);
+}
+
+.btn-edit:hover {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: var(--primary);
+}
+
+.btn-delete:hover {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: var(--danger);
 }
