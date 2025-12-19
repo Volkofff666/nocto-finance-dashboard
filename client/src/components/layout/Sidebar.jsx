@@ -20,6 +20,11 @@ export default function Sidebar() {
           <span>Транзакции</span>
         </NavLink>
         
+        <NavLink to="/performance" className={({ isActive }) => `menu__item ${isActive ? 'active' : ''}`}>
+          <i className="fas fa-users"></i>
+          <span>Эффективность</span>
+        </NavLink>
+        
         <NavLink to="/kp-generator" className={({ isActive }) => `menu__item ${isActive ? 'active' : ''}`}>
           <i className="fas fa-file-invoice"></i>
           <span>Генератор КП</span>
