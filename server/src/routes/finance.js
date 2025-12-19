@@ -1,14 +1,16 @@
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
-import { authenticateToken, requireRole } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 const prisma = new PrismaClient();
 
+// Hardcoded user ID for no-auth mode
+const DEMO_USER_ID = 'demo-user-1';
+
 // GET /api/finance/stats — KPI метрики
-router.get('/stats', authenticateToken, async (req, res) => {
+router.get('/stats', async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = DEMO_USER_ID;
 
     const transactions = await prisma.transaction.findMany({
       where: { userId },
@@ -75,10 +77,10 @@ router.get('/stats', authenticateToken, async (req, res) => {
 });
 
 // GET /api/finance/transactions — Список транзакций
-router.get('/transactions', authenticateToken, async (req, res) => {
+router.get('/transactions', async (req, res) => {
   try {
     const { page = 1, limit = 20, startDate, endDate, status } = req.query;
-    const userId = req.user.id;
+    const userId = DEMO_USER_ID;
 
     const where = {
       userId,
@@ -117,7 +119,7 @@ router.get('/transactions', authenticateToken, async (req, res) => {
 });
 
 // POST /api/finance/transactions — Добавить транзакцию
-router.post('/transactions', authenticateToken, async (req, res) => {
+router.post('/transactions', async (req, res) => {
   try {
     const { client, amount, status, date } = req.body;
 
@@ -127,7 +129,7 @@ router.post('/transactions', authenticateToken, async (req, res) => {
 
     const transaction = await prisma.transaction.create({
       data: {
-        userId: req.user.id,
+        userId: DEMO_USER_ID,
         client,
         amount: parseFloat(amount),
         status,
@@ -143,16 +145,10 @@ router.post('/transactions', authenticateToken, async (req, res) => {
 });
 
 // PUT /api/finance/transactions/:id — Обновить транзакцию
-router.put('/transactions/:id', authenticateToken, async (req, res) => {
+router.put('/transactions/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { client, amount, status, date } = req.body;
-
-    // Проверка владельца
-    const existing = await prisma.transaction.findUnique({ where: { id } });
-    if (!existing || existing.userId !== req.user.id) {
-      return res.status(404).json({ error: 'Транзакция не найдена' });
-    }
 
     const transaction = await prisma.transaction.update({
       where: { id },
@@ -172,27 +168,15 @@ router.put('/transactions/:id', authenticateToken, async (req, res) => {
 });
 
 // DELETE /api/finance/transactions/:id — Удалить транзакцию
-router.delete(
-  '/transactions/:id',
-  authenticateToken,
-  requireRole(['admin', 'accountant']),
-  async (req, res) => {
-    try {
-      const { id } = req.params;
-
-      // Проверка владельца
-      const existing = await prisma.transaction.findUnique({ where: { id } });
-      if (!existing || existing.userId !== req.user.id) {
-        return res.status(404).json({ error: 'Транзакция не найдена' });
-      }
-
-      await prisma.transaction.delete({ where: { id } });
-      res.json({ message: 'Транзакция удалена' });
-    } catch (error) {
-      console.error('Delete transaction error:', error);
-      res.status(400).json({ error: error.message });
-    }
+router.delete('/transactions/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await prisma.transaction.delete({ where: { id } });
+    res.json({ message: 'Транзакция удалена' });
+  } catch (error) {
+    console.error('Delete transaction error:', error);
+    res.status(400).json({ error: error.message });
   }
-);
+});
 
 export default router;
