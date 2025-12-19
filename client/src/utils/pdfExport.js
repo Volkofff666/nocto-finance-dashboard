@@ -1,40 +1,36 @@
-import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 /**
- * Экспорт коммерческого предложения в PDF
- * @param {HTMLElement} element - DOM элемент для экспорта
- * @param {string} filename - Имя файла для сохранения
- * @returns {Promise<void>}
+ * Экспорт HTML элемента в PDF
+ * @param {HTMLElement} element - Элемент для экспорта
+ * @param {string} filename - Имя файла PDF
  */
 export async function exportProposalToPDF(element, filename = 'nocto-proposal.pdf') {
-  if (!element) {
-    throw new Error('Элемент для экспорта не найден');
-  }
-
   try {
-    // Создаём canvas из HTML элемента
+    // Создаем canvas из HTML
     const canvas = await html2canvas(element, {
-      scale: 2, // Увеличиваем качество
-      backgroundColor: '#09090b', // Фон из дизайн-системы
+      scale: 2,
+      backgroundColor: '#09090b',
       logging: false,
-      useCORS: true, // Для загрузки изображений со сторонних доменов
-      windowWidth: 1200 // Фиксированная ширина для консистентности
+      useCORS: true,
+      allowTaint: true
     });
 
     const imgData = canvas.toDataURL('image/png');
     
-    // Создаём PDF документ (A4 формат)
+    // Размеры A4
     const pdf = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
       format: 'a4'
     });
 
-    // Рассчитываем размеры для вмещения на A4
-    const imgWidth = 210; // A4 width in mm
+    const pageWidth = 210; // A4 width in mm
     const pageHeight = 297; // A4 height in mm
+    const imgWidth = pageWidth;
     const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
     let heightLeft = imgHeight;
     let position = 0;
 
@@ -42,7 +38,7 @@ export async function exportProposalToPDF(element, filename = 'nocto-proposal.pd
     pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
     heightLeft -= pageHeight;
 
-    // Если контент не вмещается, добавляем новые страницы
+    // Добавляем остальные страницы, если нужно
     while (heightLeft > 0) {
       position = heightLeft - imgHeight;
       pdf.addPage();
@@ -55,22 +51,8 @@ export async function exportProposalToPDF(element, filename = 'nocto-proposal.pd
     
     return true;
   } catch (error) {
-    console.error('Ошибка при экспорте PDF:', error);
-    throw new Error(`Не удалось создать PDF: ${error.message}`);
+    console.error('PDF export error:', error);
+    alert('Ошибка при экспорте в PDF');
+    return false;
   }
-}
-
-/**
- * Формирует имя файла для КП
- * @param {string} clientName - Имя клиента
- * @returns {string}
- */
-export function generateProposalFilename(clientName) {
-  const timestamp = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-  const sanitizedName = clientName
-    .replace(/[^\w\s-]/g, '') // Удаляем спецсимволы
-    .replace(/\s+/g, '_') // Пробелы на подчёркивания
-    .substring(0, 30); // Ограничиваем длину
-  
-  return `KP_${sanitizedName}_${timestamp}.pdf`;
 }
