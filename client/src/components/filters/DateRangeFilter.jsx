@@ -1,22 +1,11 @@
 import React, { useState } from 'react';
 import './DateRangeFilter.css';
 
-/**
- * Компонент фильтрации по диапазону дат
- * @param {Function} onFilterChange - Callback для применения фильтров
- * @param {Object} initialRange - Начальные значения фильтров
- */
-export default function DateRangeFilter({ onFilterChange, initialRange = {} }) {
-  const [startDate, setStartDate] = useState(initialRange.startDate || '');
-  const [endDate, setEndDate] = useState(initialRange.endDate || '');
+export default function DateRangeFilter({ onFilterChange }) {
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   const handleApply = () => {
-    // Проверка: начальная дата не может быть позже конечной
-    if (startDate && endDate && new Date(startDate) > new Date(endDate)) {
-      alert('Начальная дата не может быть позже конечной');
-      return;
-    }
-
     onFilterChange({ startDate, endDate });
   };
 
@@ -26,15 +15,14 @@ export default function DateRangeFilter({ onFilterChange, initialRange = {} }) {
     onFilterChange({ startDate: '', endDate: '' });
   };
 
-  // Быстрые фильтры
-  const setQuickFilter = (days) => {
+  const handleQuickFilter = (days) => {
     const end = new Date();
     const start = new Date();
     start.setDate(start.getDate() - days);
-
+    
     const startStr = start.toISOString().split('T')[0];
     const endStr = end.toISOString().split('T')[0];
-
+    
     setStartDate(startStr);
     setEndDate(endStr);
     onFilterChange({ startDate: startStr, endDate: endStr });
@@ -42,46 +30,44 @@ export default function DateRangeFilter({ onFilterChange, initialRange = {} }) {
 
   return (
     <div className="date-filter">
+      <div className="date-filter__quick">
+        <button onClick={() => handleQuickFilter(7)} className="quick-btn">
+          7 дней
+        </button>
+        <button onClick={() => handleQuickFilter(30)} className="quick-btn">
+          30 дней
+        </button>
+        <button onClick={() => handleQuickFilter(90)} className="quick-btn">
+          90 дней
+        </button>
+      </div>
+
       <div className="date-filter__inputs">
         <label>
-          <span className="text-muted">От</span>
-          <input
-            type="date"
-            value={startDate}
+          <span className="label-text">От</span>
+          <input 
+            type="date" 
+            value={startDate} 
             onChange={(e) => setStartDate(e.target.value)}
             className="date-input"
           />
         </label>
         <label>
-          <span className="text-muted">До</span>
-          <input
-            type="date"
-            value={endDate}
+          <span className="label-text">До</span>
+          <input 
+            type="date" 
+            value={endDate} 
             onChange={(e) => setEndDate(e.target.value)}
             className="date-input"
           />
         </label>
       </div>
 
-      <div className="date-filter__quick">
-        <button onClick={() => setQuickFilter(7)} className="btn-quick" title="Последние 7 дней">
-          7Д
-        </button>
-        <button onClick={() => setQuickFilter(30)} className="btn-quick" title="Последние 30 дней">
-          30Д
-        </button>
-        <button onClick={() => setQuickFilter(90)} className="btn-quick" title="Последние 90 дней">
-          90Д
-        </button>
-      </div>
-
       <div className="date-filter__actions">
-        <button onClick={handleApply} className="btn-primary">
-          <i className="fas fa-check"></i>
+        <button onClick={handleApply} className="btn-primary btn-sm">
           Применить
         </button>
-        <button onClick={handleReset} className="btn-secondary">
-          <i className="fas fa-times"></i>
+        <button onClick={handleReset} className="btn-secondary btn-sm">
           Сбросить
         </button>
       </div>
